@@ -62,11 +62,11 @@ function email_checker($commits_url, $json, $config, $opts, $commits)
         }
         if (!$bozo) {
             $status["state"]       = "success";
-            $status["description"] = "This commit has good email addresses. Yay!";
+            $status["description"] = "Commit has good email addresses. Yay!";
             $debug_message .= "$author / $committer -- looks good!\n";
         } else {
             $status["state"]       = "failure";
-            $status["description"] = "Bozo $id email address: $bozo_addr.";
+            $status["description"] = "Bad $id: $bozo_addr.";
             if (isset($target_url)) {
                 $status["target_url"]  = $target_url;
             }

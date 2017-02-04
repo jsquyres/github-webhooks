@@ -48,11 +48,11 @@ function signed_off_by_checker($commits_url, $json, $config, $opts, $commits)
         # Look for a Signed-off-by string in this commit
         if (preg_match("/Signed-off-by/", $message)) {
             $status["state"]       = "success";
-            $status["description"] = "This commit is signed off. Yay!";
+            $status["description"] = "Commit is signed off. Yay!";
             $debug_message .= "This commit is signed off\n\n";
         } else {
             $status["state"]       = "failure";
-            $status["description"] = "This commit is not signed off.";
+            $status["description"] = "Commit not signed off.";
             if (isset($target_url)) {
                 $status["target_url"]  = $target_url;
             }
