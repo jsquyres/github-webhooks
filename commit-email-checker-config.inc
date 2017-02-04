@@ -33,7 +33,7 @@ function fill_webhook_config()
 
     # The name that will appear for this CI agent at GitHub on pull
     # requests.
-    $config["ci-context"] = "Bozo email checker";
+    $config["ci-context"] = "Commit email checker";
 
     # Optional: if a commit contains a boneheaded email address, link
     # to this URL

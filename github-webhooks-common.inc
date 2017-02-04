@@ -227,9 +227,19 @@ function gwc_repo_matches($full_name, $key)
 
 ##############################################################################
 
+function gwc_set_github_commit_status($config, $status_url, $status)
+{
+    $ch = gwc_open_curl($status_url, $config);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($status));
+    $output = curl_exec($ch);
+    curl_close($ch);
+}
+
+##############################################################################
+
 function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
 {
-    $happy = true;
     if (isset($config["ci-link-url"]) &&
         $config["ci-link-url"] != "") {
         $target_url = $config["ci-link-url"];
@@ -238,6 +248,8 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
     $final_message = "";
 
     $i = 0;
+    $good_count = 0;
+    $bad_count = 0;
     foreach ($commits as $key => $value) {
         if (!isset($value->{"sha"}) ||
             !isset($value->{"commit"}) ||
@@ -245,8 +257,9 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
             gwc_die("Somehow commit infomation is missing from Github's response...");
         }
 
-        $sha = $value->{"sha"};
         $message = $value->{"commit"}->{"message"};
+
+        $sha = $value->{"sha"};
         $repo = $json->{"repository"}->{"full_name"};
         $status_url = $config["api_url_base"] . "/repos/$repo/statuses/$sha";
         $debug_message .= "examining commit index $i / sha $sha:\nstatus url: $status_url\n";
@@ -255,21 +268,35 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
             "context" => $config["ci-context"]
         );
 
-        # Look for a Signed-off-by string in this commit
-        if (preg_match("/Signed-off-by/", $message)) {
+        # Call the "check one commit" function to see if this commit
+        # is good or bad.
+        $msg = "";
+        $good = $config["gwc check one function"]($value, $config, $msg);
+
+        # Process the result of that message
+        if ($good) {
+            ++$good_count;
             $status["state"]       = "success";
-            $status["description"] = "Commit is signed off. Yay!";
-            $debug_message .= "This commit is signed off\n\n";
+            if ($msg != "") {
+                $status["description"] = $msg;
+            } else {
+                $status["description"] = $config["gwc one good msg"];
+            }
         } else {
+            ++$bad_count;
             $status["state"]       = "failure";
-            $status["description"] = "Commit not signed off.";
+            if ($msg != "") {
+                $status["description"] = $msg;
+            } else {
+                $status["description"] = $config["gwc one bad msg"];
+            }
             if (isset($target_url)) {
                 $status["target_url"]  = $target_url;
             }
-            $debug_message .= "This commit is NOT signed off\n\n";
 
             $happy = false;
         }
+        $debug_message .= "This commit is: ". $status["description"];
         $final_message = $status["description"];
 
         # If this is the last commit in the array (and there's more than
@@ -277,12 +304,16 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
         # represent the entire PR (because Github shows the status of the
         # last commit as the status of the overall PR).
         if ($i == count($commits) - 1 && $i > 0) {
-            if ($happy) {
+            if ($good_count == count($commits)) {
                 $status["state"]       = "success";
-                $status["description"] = "All commits signed off. Yay!";
+                $status["description"] = $config["gwc all good msg"];
             } else {
                 $status["state"]       = "failure";
-                $status["description"] = "Some commits not signed off.";
+                if ($bad_count == count($commits)) {
+                    $status["description"] = $config["gwc all bad msg"];
+                } else {
+                    $status["description"] = $config["gwc some bad msg"];
+                }
                 if (isset($target_url)) {
                     $status["target_url"]  = $target_url;
                 }
@@ -291,11 +322,7 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
         }
 
         # Send the results back to Github for this specific commit
-        $ch = gwc_open_curl($status_url, $config);
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($status));
-        $output = curl_exec($ch);
-        curl_close($ch);
+        gwc_set_github_commit_status($config, $status_url, $status);
 
         ++$i;
     }
