@@ -101,4 +101,14 @@ function signed_off_by_checker($commits_url, $json, $config, $opts, $commits)
 ##############################################################################
 # Main
 
-webhook_main("signed-off-by-checker-config.inc", "signed_off_by_checker");
+$config["gwc user config file"] = "signed-off-by-checker-config.inc";
+$config["gwc check all function"] = "gwc_check_all_commits";
+$config["gwc check one function"] = "signed_off_by_checker";
+
+$config["gwc one good msg"] = "Commit is signed off.  Yay!";
+$config["gwc all good msg"] = "All commits signed off.  Yay!";
+$config["gwc one bad msg"] = "Commit not signed off";
+$config["gwc some bad msg"] = "Some commits not signed off";
+$config["gwc all bad msg"] = "No commits signed off";
+
+gwc_webhook_main($config);

@@ -114,4 +114,14 @@ function email_checker($commits_url, $json, $config, $opts, $commits)
 ##############################################################################
 # Main
 
-webhook_main("commit-email-checker-config.inc", "email_checker");
+$config["gwc user config file"] = "commit-email-checker-config.inc";
+$config["gwc check all function"] = "gwc_check_all_commits";
+$config["gwc check one function"] = "email_checker";
+
+$config["gwc one good msg"] = "Good email address.  Yay!";
+$config["gwc all good msg"] = "All commits have good email addresses.  Yay!";
+$config["gwc one bad msg"] = "Bad email address";
+$config["gwc some bad msg"] = "Some commits have bad email addresses";
+$config["gwc all bad msg"] = "No commits have sane email addresses";
+
+gwc_webhook_main($config);

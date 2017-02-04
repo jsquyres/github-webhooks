@@ -30,7 +30,7 @@ if (!function_exists('http_response_code')) {
 
 ##############################################################################
 
-function my_die($msg, $code = 400)
+function gwc_die($msg, $code = 400)
 {
     # Die with a non-200 error code
     http_response_code($code);
@@ -38,7 +38,7 @@ function my_die($msg, $code = 400)
     die($msg);
 }
 
-function debug($config, $str)
+function gwc_debug($config, $str)
 {
     if (isset($config["debug"]) && $config["debug"]) {
         print($str);
@@ -47,7 +47,7 @@ function debug($config, $str)
 
 ##############################################################################
 
-function check_for_allowed_sources($config)
+function gwc_check_for_allowed_sources($config)
 {
     global $config;
 
@@ -75,12 +75,12 @@ function check_for_allowed_sources($config)
             }
         }
         if (!$happy) {
-            my_die("Discarding request from disallowed IP address ($source_str)\n");
+            gwc_die("Discarding request from disallowed IP address ($source_str)\n");
         }
     }
 }
 
-function get_payload()
+function gwc_get_payload()
 {
     # Ensure we got a non-empty payload
     if (isset($_POST["payload"])) {
@@ -92,23 +92,23 @@ function get_payload()
         }
     }
 
-    my_die("Received POST request with empty payload\n");
+    gwc_die("Received POST request with empty payload\n");
 }
 
 ##############################################################################
 
-function parse_json($json_string)
+function gwc_parse_json($json_string)
 {
     # Parse the JSON
     $json = json_decode($json_string);
     if (json_last_error() != JSON_ERROR_NONE) {
-        my_die("Got invalid JSON\n");
+        gwc_die("Got invalid JSON\n");
     }
 
     return $json;
 }
 
-function fill_opts_from_json($json)
+function gwc_fill_opts_from_json($json)
 {
     # If this is just a github ping, we can ignore it
     if (!isset($json->{"action"}) ||
@@ -123,7 +123,7 @@ function fill_opts_from_json($json)
     return $opts;
 }
 
-function fill_opts_from_keys($config, $opts, $arr)
+function gwc_fill_opts_from_keys($config, $opts, $arr)
 {
     # Deep copy the keys/values into the already-existing $opts
     # array
@@ -143,7 +143,7 @@ function fill_opts_from_keys($config, $opts, $arr)
 
 ##############################################################################
 
-function open_curl($url, $config)
+function gwc_open_curl($url, $config)
 {
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_USERAGENT, $config["ci-context"]);
@@ -169,7 +169,7 @@ function open_curl($url, $config)
     return $ch;
 }
 
-function get_commits($commits_url, $config)
+function gwc_get_commits($commits_url, $config)
 {
     # This webhook will have only delivered the *new* commits on this
     # PR.  We need to examine *all* the commits on this PR -- so we
@@ -178,21 +178,21 @@ function get_commits($commits_url, $config)
     # (note: putting the Authorization header in this request just in
     # case this is a private repo).
 
-    $ch = open_curl($commits_url, $config);
+    $ch = gwc_open_curl($commits_url, $config);
     $output = curl_exec($ch);
 
     # Check to see if we got success
     if (curl_errno($ch)) {
         curl_close($ch);
-        my_die("Sorry, something went wrong while trying to obtain the URL \"$commits_url\".");
+        gwc_die("Sorry, something went wrong while trying to obtain the URL \"$commits_url\".");
     }
     curl_close($ch);
 
-    $commits = parse_json($output);
+    $commits = gwc_parse_json($output);
 
     # Sanity check
     if (count($commits) == 0) {
-        my_die("Somehow there are no commits on this PR... weird...");
+        gwc_die("Somehow there are no commits on this PR... weird...");
     }
 
     return $commits;
@@ -200,7 +200,7 @@ function get_commits($commits_url, $config)
 
 ##############################################################################
 
-function repo_matches($full_name, $key)
+function gwc_repo_matches($full_name, $key)
 {
     if ($full_name == $key) {
         return 1;
@@ -227,20 +227,91 @@ function repo_matches($full_name, $key)
 
 ##############################################################################
 
-function process($json, $config, $opts, $value, $process_fn)
+function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
 {
-    $opts = fill_opts_from_keys($config, $opts, $value);
+    $happy = true;
+    if (isset($config["ci-link-url"]) &&
+        $config["ci-link-url"] != "") {
+        $target_url = $config["ci-link-url"];
+    }
+    $debug_message = "checking URL: $commits_url\n\n";
+    $final_message = "";
 
-    $commits_url = $json->{"pull_request"}->{"commits_url"};
-    $commits = get_commits($commits_url, $config);
-    $process_fn($commits_url, $json, $config, $opts, $commits);
+    $i = 0;
+    foreach ($commits as $key => $value) {
+        if (!isset($value->{"sha"}) ||
+            !isset($value->{"commit"}) ||
+            !isset($value->{"commit"}->{"message"})) {
+            gwc_die("Somehow commit infomation is missing from Github's response...");
+        }
+
+        $sha = $value->{"sha"};
+        $message = $value->{"commit"}->{"message"};
+        $repo = $json->{"repository"}->{"full_name"};
+        $status_url = $config["api_url_base"] . "/repos/$repo/statuses/$sha";
+        $debug_message .= "examining commit index $i / sha $sha:\nstatus url: $status_url\n";
+
+        $status = array(
+            "context" => $config["ci-context"]
+        );
+
+        # Look for a Signed-off-by string in this commit
+        if (preg_match("/Signed-off-by/", $message)) {
+            $status["state"]       = "success";
+            $status["description"] = "Commit is signed off. Yay!";
+            $debug_message .= "This commit is signed off\n\n";
+        } else {
+            $status["state"]       = "failure";
+            $status["description"] = "Commit not signed off.";
+            if (isset($target_url)) {
+                $status["target_url"]  = $target_url;
+            }
+            $debug_message .= "This commit is NOT signed off\n\n";
+
+            $happy = false;
+        }
+        $final_message = $status["description"];
+
+        # If this is the last commit in the array (and there's more than
+        # one commit in the array), override its state and description to
+        # represent the entire PR (because Github shows the status of the
+        # last commit as the status of the overall PR).
+        if ($i == count($commits) - 1 && $i > 0) {
+            if ($happy) {
+                $status["state"]       = "success";
+                $status["description"] = "All commits signed off. Yay!";
+            } else {
+                $status["state"]       = "failure";
+                $status["description"] = "Some commits not signed off.";
+                if (isset($target_url)) {
+                    $status["target_url"]  = $target_url;
+                }
+            }
+            $final_message = $status["description"];
+        }
+
+        # Send the results back to Github for this specific commit
+        $ch = gwc_open_curl($status_url, $config);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($status));
+        $output = curl_exec($ch);
+        curl_close($ch);
+
+        ++$i;
+    }
+
+    gwc_debug($config, "$debug_message\n");
+    printf("$final_message\n");
+
+    # Happiness!  Exit.
+    exit(0);
 }
 
 ##############################################################################
 
 # Sanity check
 
-function verify_post()
+function gwc_verify_post()
 {
     # Verify that this is a POST
     if (!isset($_SERVER["REQUEST_METHOD"]) ||
@@ -253,46 +324,108 @@ function verify_post()
     }
 }
 
-function load_config($config_filename)
+function gwc_verify_config($config)
 {
-    if (!is_file($config_filename)) {
-        my_die("Cannot find $config_filename config file.");
+    $a = array("gwc user config file",
+               "gwc check all function",
+               "gwc check one function");
+    foreach ($a as $key => $value) {
+        if (!isset($config[$value])) {
+            gwc_die("Something weird wrong: missing '$value' in internal configuration");
+        }
     }
+
+    if (!isset($config["gwc one good msg"])) {
+        $config["gwc one good msg"] = "Good commit. Yay!";
+    }
+    if (!isset($config["gwc all good msg"])) {
+        $config["gwc all good msg"] = "All commits good. Yay!";
+    }
+    if (!isset($config["gwc one bad msg"])) {
+        $config["gwc one bad msg"] = "Bad commit";
+    }
+    if (!isset($config["gwc some bad msg"])) {
+        $config["gwc some bad msg"] = "Some commits bad";
+    }
+    if (!isset($config["gwc all bad msg"])) {
+        $config["gwc all bad msg"] = "All commits bad";
+    }
+
+    return $config;
+}
+
+function gwc_verify_function($name, $msg = "")
+{
+    if (!function_exists($name)) {
+        if ($msg != "") {
+            gwc_die($msg);
+        } else {
+            gwc_die("Cannot find the $name() function.  I'm just going to lie dwne here, quietly, in the snow for a while...");
+        }
+    }
+}
+
+function gwc_load_user_config($config)
+{
+    # Sanity check
+    $config_filename = $config["gwc user config file"];
+    if (!is_file($config_filename)) {
+        gwc_die("Cannot find $config_filename config file.");
+    }
+
+    # Include the user config file
     require_once $config_filename;
 
-    if (!function_exists('fill_webhook_config')) {
-        my_die("Cannot find the fill_webhook_config() function in the $config_filename file.");
-    }
+    # Make sure that user config file defined the
+    # "fill_webhook_config" function
+    gwc_verify_function("fill_webhook_config",
+                        "Cannot find the fill_webhook_config() function in the $config_filename file.");
 
-    $config = fill_webhook_config();
+    # Run the user config function to get their data
+    $user_config = fill_webhook_config();
+
+    # Merge the script-provided config and user-provided config together
+    foreach ($user_config as $key => $value) {
+        $config[$key] = $value;
+    }
 
     return $config;
 }
 
 # Main (called by each of the individual webhook .php files)
 
-function webhook_main($config_filename, $process_fn)
+function gwc_webhook_main($config)
 {
     # Sanity checks
-    verify_post();
+    gwc_verify_post();
+    $config = gwc_verify_config($config);
+    gwc_verify_function($config["gwc check all function"]);
+    gwc_verify_function($config["gwc check one function"]);
 
     # Load the config file
-    $config = load_config($config_filename);
+    $config = gwc_load_user_config($config);
 
     # Ensure that we abide by allowed sources
-    check_for_allowed_sources($config);
+    gwc_check_for_allowed_sources($config);
 
-    $payload = get_payload();
-    $json = parse_json($payload);
-    $opts = fill_opts_from_json($json);
+    $payload = gwc_get_payload();
+    $json = gwc_parse_json($payload);
+    $opts = gwc_fill_opts_from_json($json);
 
     # Loop over all the repos in the config; see if this incoming
     # request is from one we recognize.  The keys of $config["github"]
     # are repo names (e.g., "jsquyres/github-webhooks").
     $repo = $json->{"repository"}->{"full_name"};
     foreach ($config["github"] as $key => $value) {
-        if (repo_matches($repo, $key)) {
-            process($json, $config, $opts, $value, $process_fn);
+        if (gwc_repo_matches($repo, $key)) {
+            # Get the JSON of the commits on this PR
+            $commits_url = $json->{"pull_request"}->{"commits_url"};
+            $commits = gwc_get_commits($commits_url, $config);
+
+            # Process the commits
+            $opts = gwc_fill_opts_from_keys($config, $opts, $value);
+            $config["gwc check all function"]($commits_url, $json, $config,
+                              $opts, $commits);
 
             # the process function should hopefully not return, but be
             # paranoid anyway
@@ -301,5 +434,5 @@ function webhook_main($config_filename, $process_fn)
     }
 
     # If we get here, it means we didn't find a repo match
-    my_die("Sorry; $repo is not a Github repo for which I provide service.");
+    gwc_die("Sorry; $repo is not a Github repo for which I provide service.");
 }
