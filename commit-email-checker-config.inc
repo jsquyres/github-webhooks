@@ -10,11 +10,11 @@
 
 ##############################################################################
 ##############################################################################
-# This file must contain the function fill_config().
+# This file must contain the function fill_webhook_config().
 ##############################################################################
 ##############################################################################
 
-function fill_config()
+function fill_webhook_config()
 {
     # git-commit-email-checker.php will ignore any incoming POST that does
     # not come from these network blocks.
@@ -49,7 +49,7 @@ function fill_config()
     # - wildcard the username/org name: */email-checker-github-webhook
     # - wildcard the repo name: jsquyres/*
     # - wildcard both names: */*
-    #$config["github"]["jsquyres/email-checker-github-webhook"] = 1;
+    #$config["github"]["jsquyres/github-webhooks"] = 1;
     $config["github"]["jsquyres/*"] = 1;
 
     # GitHub API URL.  Can be configured for internal / GitHub
@@ -59,6 +59,10 @@ function fill_config()
     # GHE: http[s]://YOUR_GHE_SERVER/api/v3
     #
     $config["api_url_base"] = "https://api.github.com";
+
+    #####################################################################
+    # Config specific to the bozo email checker
+    #####################################################################
 
     # Array of regular expressions used to check author/committer
     # email addresses.  These are Perl-style regular expressions

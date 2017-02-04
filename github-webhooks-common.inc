@@ -12,6 +12,8 @@
 # Common helpers for all the github webhooks
 #
 
+##############################################################################
+
 # For 4.3.0 <= PHP <= 5.4.0
 if (!function_exists('http_response_code')) {
     function http_response_code($newcode = NULL) {
@@ -25,6 +27,8 @@ if (!function_exists('http_response_code')) {
         return $code;
     }
 }
+
+##############################################################################
 
 function my_die($msg, $code = 400)
 {
@@ -194,6 +198,8 @@ function get_commits($commits_url, $config)
     return $commits;
 }
 
+##############################################################################
+
 function repo_matches($full_name, $key)
 {
     if ($full_name == $key) {
@@ -219,6 +225,8 @@ function repo_matches($full_name, $key)
     return 0;
 }
 
+##############################################################################
+
 function process($json, $config, $opts, $value, $process_fn)
 {
     $opts = fill_opts_from_keys($config, $opts, $value);
@@ -230,9 +238,9 @@ function process($json, $config, $opts, $value, $process_fn)
 
 ##############################################################################
 
-# Main (called by each of the individual webhook .php files)
+# Sanity check
 
-function webhook_main($config_filename, $process_fn)
+function verify_post()
 {
     # Verify that this is a POST
     if (!isset($_SERVER["REQUEST_METHOD"]) ||
@@ -243,14 +251,38 @@ function webhook_main($config_filename, $process_fn)
             " as a WebHook URL in your Github repository settings.\n");
         exit(1);
     }
+}
 
-    # Read the config
-    $config = fill_config($config_filename);
+function load_config($config_filename)
+{
+    if (!is_file($config_filename)) {
+        my_die("Cannot find $config_filename config file.");
+    }
+    require_once $config_filename;
 
+    if (!function_exists('fill_webhook_config')) {
+        my_die("Cannot find the fill_webhook_config() function in the $config_filename file.");
+    }
+
+    $config = fill_webhook_config();
+
+    return $config;
+}
+
+# Main (called by each of the individual webhook .php files)
+
+function webhook_main($config_filename, $process_fn)
+{
     # Sanity checks
-    check_for_allowed_sources($config);
-    $payload = get_payload();
+    verify_post();
 
+    # Load the config file
+    $config = load_config($config_filename);
+
+    # Ensure that we abide by allowed sources
+    check_for_allowed_sources($config);
+
+    $payload = get_payload();
     $json = parse_json($payload);
     $opts = fill_opts_from_json($json);
 
@@ -260,13 +292,14 @@ function webhook_main($config_filename, $process_fn)
     $repo = $json->{"repository"}->{"full_name"};
     foreach ($config["github"] as $key => $value) {
         if (repo_matches($repo, $key)) {
-            process($json, $config, $opts, $value);
+            process($json, $config, $opts, $value, $process_fn);
 
-            # process() will not return, but be paranoid anyway
+            # the process function should hopefully not return, but be
+            # paranoid anyway
             exit(0);
         }
     }
 
     # If we get here, it means we didn't find a repo match
-    my_die("Sorry; $repo is not a Github repo for which I provide service");
+    my_die("Sorry; $repo is not a Github repo for which I provide service.");
 }
