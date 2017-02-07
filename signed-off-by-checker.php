@@ -22,6 +22,7 @@ function signed_off_by_checker($commit, $config, &$msg_out)
     if (preg_match("/Signed-off-by: /", $commit->{"commit"}->{"message"})) {
         return true;
     } else {
+        $msg_out = $config["gwc one bad msg"];
         return false;
     }
 }
