@@ -114,6 +114,14 @@ This webhook does a simple check: it makes sure that each commit in
 the PR contains the `Signed-off-by` token.  If a commit does not
 contain this token, it fails the check.
 
+### Expanding the signed-off-by checker
+
+You can expand this webhook easily.
+
+For example, it may be desirable to look for specific signoffs.  E.g.,
+you might want to look for signoffs from specific team leads when
+junior developers make PRs.
+
 ## Committer and author email checker
 
 This webhook checks for common errors in commit email addresses, and
@@ -127,6 +135,17 @@ By default, this webhook checks that the commiter and author email addresses on 
 
 These three checks tend to catch newbie Git users who have forgotten
 to set their username and email address in their Git configuration.
+
+### Expanding the email checker
+
+It may also be desirable to ensure other qualities about the committer
+and/or author emails.  For example:
+
+1. Ensure that the committer is a current employee in your
+   organization (we do this in my group at work).
+1. Ensure that the author is from an approved list of authors.
+
+And so on.
 
 # History
 
