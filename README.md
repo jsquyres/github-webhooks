@@ -16,7 +16,7 @@ period of time.
 Installation is comprised of two parts:
 
 1. Installation on the web server
-1. Installation at github.com
+1. Installation at github.com or GitHub Enterprise
 
 ## Installation on the web server
 
@@ -31,7 +31,8 @@ Installation is comprised of two parts:
      these repos.
      * You can generate a Github PAT by visiting
        https://github.com/settings/tokens and clicking the "Generate
-       new tokens" button in the top right.
+       new tokens" button in the top right (or
+       https://YOUR_GHE_SERVER/settings/tokens).
      * The only permission that this PAT needs is `repo:status`.
 1. Configure your web server to deny client access to the
    `*.inc` files.
@@ -47,7 +48,7 @@ Installation is comprised of two parts:
 </Files>
 ```
 
-## Installation at Github.com
+## Installation at github.com / GitHub Enterprise
 
 1. On Github.com, create a custom webhook for your Git repo:
    * The URL should be the URL of either of your newly-installed `.php` files (e.g., `https://SERVER_NAME/PATH/signed-off-by-checker.php`).
@@ -56,7 +57,7 @@ Installation is comprised of two parts:
      * Check the "Pull request" event.
      * You can choose to leave the "Push" event checked or not.
    * Make the webhook active.
-1. When you create a webhook at github.com, it should send a "ping" request to the webhook to make sure it is correct.
+1. When you create a webhook at github.com / your GHE server, it should send a "ping" request to the webhook to make sure it is correct.
    * On your git repository's webhooks page, click on your webhook.
    * On the resulting page, scroll down to the "Recent Deliveries" section.  The very first delivery will be the "ping" event.
    * Click on the first delivery and check that the response code is 200.
