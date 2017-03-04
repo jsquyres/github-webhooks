@@ -16,8 +16,8 @@
 
 function fill_webhook_config()
 {
-    # git-commit-email-checker.php will ignore any incoming POST that does
-    # not come from these network blocks.
+    # Ignore any incoming POST that does not come from these network
+    # blocks.
     #
     # For GitHub Enterprise, fill in the CIDR notation for your GitHub
     # server(s).
