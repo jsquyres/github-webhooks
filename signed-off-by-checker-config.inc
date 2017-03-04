@@ -35,8 +35,8 @@ function fill_webhook_config()
     # requests.
     $config["ci-context"] = "Signed-off-by checker";
 
-    # Optional: if a commit contains a boneheaded email address, link
-    # to this URL
+    # Optional: if a commit contains a commit without a
+    # "Signed-off-by", link to this URL
     #$config["ci-link-url"] = "http://example.com";
 
     # You almost certainly want "debug" set to 0 (or unset)
