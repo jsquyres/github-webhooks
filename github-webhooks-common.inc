@@ -80,6 +80,52 @@ function gwc_check_for_allowed_sources($config)
     }
 }
 
+function gwc_check_for_github_allowed_events($config)
+{
+    # Make sure the GitHub event header is set
+    if (isset($_SERVER["HTTP_X_GITHUB_EVENT"])) {
+        gwc_die("GitHub event is not set, so I don't know what to do...");
+    }
+
+    $event = $_SERVER["HTTP_X_GITHUB_EVENT"];
+
+    # We always gracefully handle pings.
+    if ($event == "ping") {
+       print "Hello, Github ping!  I'm here!\n";
+       exit(0);
+    }
+
+    # See what other events this webhook wants to handle
+    foreach ($config["gwc events"] as $k) {
+        if ($k == $action) {
+            gwc_debug($config, "JSON indicates $event event -- yay!");
+            return;
+        }
+    }
+
+    print "This GitHub webhook does not handle \"$event\" events.  Thanks for calling!\n";
+}
+
+function gwc_check_for_github_allowed_actions($config, $json)
+{
+    # Make sure the json has an action field
+    if (!isset($json->{"action"})) {
+        gwc_die("GitHub pull request action is not set, so I don't know what to do...");
+    }
+
+    # What actions does this webhook want to handle?
+    $action = $json->{"action"};
+    foreach ($config["gwc pr actions"] as $k) {
+        if ($k == $action) {
+            gwc_debug($config, "JSON indicates $action action -- yay!");
+            return;
+        }
+    }
+
+    print "This GitHub webhook does not handle \"$action\" pull request actions.  Thanks for calling!\n";
+    exit(0);
+}
+
 function gwc_get_payload()
 {
     # Ensure we got a non-empty payload
@@ -110,14 +156,6 @@ function gwc_parse_json($json_string)
 
 function gwc_fill_opts_from_json($json)
 {
-    # If this is just a github ping, we can ignore it
-    if (!isset($json->{"action"}) ||
-        ($json->{"action"} != "synchronize" &&
-         $json->{"action"} != "opened")) {
-       print "Hello, Github ping!  I'm here!\n";
-       exit(0);
-    }
-
     $opts["repo"] = $json->{"repository"}->{"full_name"};
 
     return $opts;
@@ -435,8 +473,15 @@ function gwc_webhook_main($config)
     # Ensure that we abide by allowed sources
     gwc_check_for_allowed_sources($config);
 
+    # Ensure that this is a GitHub event that we want to process
+    gwc_check_for_allowed_events($config);
+
     $payload = gwc_get_payload();
     $json = gwc_parse_json($payload);
+
+    # Is this a GitHub action we should process?
+    gwc_check_for_github_allowed_actions($config, $json);
+
     $opts = gwc_fill_opts_from_json($json);
 
     # Loop over all the repos in the config; see if this incoming

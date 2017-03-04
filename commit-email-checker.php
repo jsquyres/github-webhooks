@@ -37,6 +37,9 @@ function email_checker($commit, $config, &$msg_out)
 ##############################################################################
 # Main
 
+$config["gwc events"] = array("pull_request");
+$config["gwc pr actions"] = array("opened", "synchronized");
+
 $config["gwc user config file"] = "commit-email-checker-config.inc";
 $config["gwc check all function"] = "gwc_check_all_commits";
 $config["gwc check one function"] = "email_checker";

@@ -30,6 +30,9 @@ function signed_off_by_checker($commit, $config, &$msg_out)
 ##############################################################################
 # Main
 
+$config["gwc events"] = array("pull_request");
+$config["gwc pr actions"] = array("opened", "synchronized");
+
 $config["gwc user config file"] = "signed-off-by-checker-config.inc";
 $config["gwc check all function"] = "gwc_check_all_commits";
 $config["gwc check one function"] = "signed_off_by_checker";
