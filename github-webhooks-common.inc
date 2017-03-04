@@ -392,8 +392,7 @@ function gwc_verify_post()
 function gwc_verify_config($config)
 {
     $a = array("gwc user config file",
-               "gwc check all function",
-               "gwc check one function");
+               "gwc check all function");
     foreach ($a as $key => $value) {
         if (!isset($config[$value])) {
             gwc_die("Something weird wrong: missing '$value' in internal configuration");
@@ -465,7 +464,9 @@ function gwc_webhook_main($config)
     gwc_verify_post();
     $config = gwc_verify_config($config);
     gwc_verify_function($config["gwc check all function"]);
-    gwc_verify_function($config["gwc check one function"]);
+    if (isset($config["gwc check one function"])) {
+        gwc_verify_function($config["gwc check one function"]);
+    }
 
     # Load the config file
     $config = gwc_load_user_config($config);
