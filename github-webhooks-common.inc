@@ -254,7 +254,7 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
         if (!isset($value->{"sha"}) ||
             !isset($value->{"commit"}) ||
             !isset($value->{"commit"}->{"message"})) {
-            gwc_die("Somehow commit infomation is missing from Github's response...");
+            gwc_die("Somehow commit information is missing from Github's response...");
         }
 
         $message = $value->{"commit"}->{"message"};
