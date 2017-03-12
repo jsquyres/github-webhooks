@@ -80,6 +80,78 @@ function gwc_check_for_allowed_sources($config)
     }
 }
 
+function gwc_check_for_allowed_events($config)
+{
+    # Make sure the GitHub event header is set
+    if (!isset($_SERVER["HTTP_X_GITHUB_EVENT"])) {
+        gwc_die("GitHub event is not set, so I don't know what to do...");
+    }
+
+    $event = $_SERVER["HTTP_X_GITHUB_EVENT"];
+
+    # We always gracefully handle pings.
+    if ($event == "ping") {
+       print "Hello, Github ping!  I'm here!\n";
+       exit(0);
+    }
+
+    # See what other events this webhook wants to handle
+    gwc_debug($config, "This GH webhook event: $event\n");
+    foreach ($config["gwc events"] as $k => $v) {
+        gwc_debug($config, "Checking allowable event: $k\n");
+        if ($k == $event) {
+            gwc_debug($config, "JSON indicates $event event -- yay!\n");
+            return $event;
+        }
+    }
+
+    print "This GitHub webhook does not handle \"$event\" events.  Thanks for calling!\n";
+    exit(0);
+}
+
+function gwc_check_push($config, $payload, $json)
+{
+    # If this is a pull request, make sure the callback function is
+    # valid
+    if (!isset($config["gwc events"]["push"]["callback"])) {
+        gwc_die("Missing function specification: gwc events:push:callback");
+    }
+
+    $fn = $config["gwc events"]["push"]["callback"];
+    gwc_verify_function($fn);
+}
+
+function gwc_check_pull_request($config, $payload, $json)
+{
+    # Make sure the json has an action field
+    if (!isset($json->{"action"})) {
+        gwc_die("GitHub pull request action is not set, so I don't know what to do...");
+    }
+
+    # If this is a pull request, make sure at least the "all" callback
+    # exists for the specified action.
+    $action = $json->{"action"};
+    gwc_debug($config, "This PR is action: $action\n");
+
+    $pr = $config["gwc events"]["pull_request"];
+    foreach ($pr as $k => $v) {
+        if ($k == $action) {
+            gwc_debug($config, "This webhook can handle action $action -- yay!\n");
+
+            if (!isset($v["callback"]) ||
+                !isset($v["callback"]["all"])) {
+                gwc_die("Missing \"all\" callback for $action action");
+            }
+
+            gwc_verify_function($v["callback"]["all"]);
+            return;
+        }
+    }
+
+    print "This GitHub webhook does not handle \"$action\" pull request actions.  Thanks for calling!\n";
+    exit(0);
+}
+
 function gwc_get_payload()
 {
     # Ensure we got a non-empty payload
@@ -110,14 +182,6 @@ function gwc_parse_json($json_string)
 
 function gwc_fill_opts_from_json($json)
 {
-    # If this is just a github ping, we can ignore it
-    if (!isset($json->{"action"}) ||
-        ($json->{"action"} != "synchronize" &&
-         $json->{"action"} != "opened")) {
-       print "Hello, Github ping!  I'm here!\n";
-       exit(0);
-    }
-
     $opts["repo"] = $json->{"repository"}->{"full_name"};
 
     return $opts;
@@ -169,7 +233,7 @@ function gwc_open_curl($url, $config)
     return $ch;
 }
 
-function gwc_get_commits($commits_url, $config)
+function gwc_pr_get_commits($commits_url, $config)
 {
     # This webhook will have only delivered the *new* commits on this
     # PR.  We need to examine *all* the commits on this PR -- so we
@@ -238,7 +302,8 @@ function gwc_set_github_commit_status($config, $status_url, $status)
 
 ##############################################################################
 
-function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
+function gwc_pr_check_all_commits($commits_url, $json, $config, $opts, $commits,
+                                  $one_fn)
 {
     if (isset($config["ci-link-url"]) &&
         $config["ci-link-url"] != "") {
@@ -271,7 +336,7 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
         # Call the "check one commit" function to see if this commit
         # is good or bad.
         $msg = "";
-        $good = $config["gwc check one function"]($value, $config, $msg);
+        $good = $one_fn($value, $config, $msg);
 
         # Process the result of that message
         if ($good) {
@@ -353,13 +418,8 @@ function gwc_verify_post()
 
 function gwc_verify_config($config)
 {
-    $a = array("gwc user config file",
-               "gwc check all function",
-               "gwc check one function");
-    foreach ($a as $key => $value) {
-        if (!isset($config[$value])) {
-            gwc_die("Something weird wrong: missing '$value' in internal configuration");
-        }
+    if (!isset($config["gwc user config file"])) {
+        gwc_die("Something weird wrong: missing 'gwc user config file' in internal configuration");
     }
 
     if (!isset($config["gwc one good msg"])) {
@@ -419,6 +479,33 @@ function gwc_load_user_config($config)
     return $config;
 }
 
+function gwc_handle_push($config, $payload, $json, $opts)
+{
+    gwc_die("JMS This function not written yet!");
+}
+
+function gwc_handle_pull_request($config, $payload, $json, $opts)
+{
+    $action = $json->{"action"};
+    if (!isset($config["gwc events"]["pull_request"][$action]["callback"]["one"])) {
+        gwc_die("The \"one\" callback function is not set for $action\n");
+    }
+    $one_fn = $config["gwc events"]["pull_request"][$action]["callback"]["one"];
+    gwc_verify_function($one_fn);
+
+    # Get the JSON of the commits on this PR
+    $commits_url = $json->{"pull_request"}->{"commits_url"};
+    $commits = gwc_pr_get_commits($commits_url, $config);
+
+    # Process the commits: call the "all" callback
+    $opts = gwc_fill_opts_from_keys($config, $opts, "1");
+    $all_fn = $config["gwc events"]["pull_request"][$action]["callback"]["all"];
+    $all_fn($commits_url, $json, $config, $opts, $commits, $one_fn);
+
+    # Probably won't return, but be paranoid here and exit anyway
+    exit(0);
+}
+
 # Main (called by each of the individual webhook .php files)
 
 function gwc_webhook_main($config)
@@ -426,8 +513,6 @@ function gwc_webhook_main($config)
     # Sanity checks
     gwc_verify_post();
     $config = gwc_verify_config($config);
-    gwc_verify_function($config["gwc check all function"]);
-    gwc_verify_function($config["gwc check one function"]);
 
     # Load the config file
     $config = gwc_load_user_config($config);
@@ -435,9 +520,20 @@ function gwc_webhook_main($config)
     # Ensure that we abide by allowed sources
     gwc_check_for_allowed_sources($config);
 
+    # Ensure that this is a GitHub event that we want to process.
+    $event = gwc_check_for_allowed_events($config);
+
     $payload = gwc_get_payload();
     $json = gwc_parse_json($payload);
     $opts = gwc_fill_opts_from_json($json);
+
+    # We currently only handle pull requests and pushes.
+    # Verify the config correctness.
+    if ($event == "pull_request") {
+        gwc_check_pull_request($config, $payload, $json);
+    } else if ($event == "push") {
+        gwc_check_push($config, $payload, $json);
+    }
 
     # Loop over all the repos in the config; see if this incoming
     # request is from one we recognize.  The keys of $config["github"]
@@ -445,14 +541,15 @@ function gwc_webhook_main($config)
     $repo = $json->{"repository"}->{"full_name"};
     foreach ($config["github"] as $key => $value) {
         if (gwc_repo_matches($repo, $key)) {
-            # Get the JSON of the commits on this PR
-            $commits_url = $json->{"pull_request"}->{"commits_url"};
-            $commits = gwc_get_commits($commits_url, $config);
-
-            # Process the commits
-            $opts = gwc_fill_opts_from_keys($config, $opts, $value);
-            $config["gwc check all function"]($commits_url, $json, $config,
-                              $opts, $commits);
+            # We currently only handle pull requests and pushes.
+            # Handle the inbound webhook.
+            if ($event == "pull_request") {
+                gwc_handle_pull_request($config, $payload, $json, $opts,
+                                        $key, $value);
+            } else if ($event == "push") {
+                gwc_handle_push($config, $payload, $json, $opts,
+                                $key, $value);
+            }
 
             # the process function should hopefully not return, but be
             # paranoid anyway

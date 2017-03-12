@@ -31,8 +31,14 @@ function signed_off_by_checker($commit, $config, &$msg_out)
 # Main
 
 $config["gwc user config file"] = "signed-off-by-checker-config.inc";
-$config["gwc check all function"] = "gwc_check_all_commits";
-$config["gwc check one function"] = "signed_off_by_checker";
+
+$config["gwc events"]["pull_request"]["opened"]["callback"]["all"] =
+    $config["gwc events"]["pull_request"]["synchronize"]["callback"]["all"] =
+    "gwc_pr_check_all_commits";
+
+$config["gwc events"]["pull_request"]["opened"]["callback"]["one"] =
+    $config["gwc events"]["pull_request"]["synchronize"]["callback"]["one"] =
+    "signed_off_by_checker";
 
 $config["gwc one good msg"] = "Commit is signed off.  Yay!";
 $config["gwc all good msg"] = "All commits signed off.  Yay!";

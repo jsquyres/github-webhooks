@@ -38,8 +38,14 @@ function email_checker($commit, $config, &$msg_out)
 # Main
 
 $config["gwc user config file"] = "commit-email-checker-config.inc";
-$config["gwc check all function"] = "gwc_check_all_commits";
-$config["gwc check one function"] = "email_checker";
+
+$config["gwc events"]["pull_request"]["opened"]["callback"]["all"] =
+    $config["gwc events"]["pull_request"]["synchronize"]["callback"]["all"] =
+    "gwc_pr_check_all_commits";
+
+$config["gwc events"]["pull_request"]["opened"]["callback"]["one"] =
+    $config["gwc events"]["pull_request"]["synchronize"]["callback"]["one"] =
+    "email_checker";
 
 $config["gwc one good msg"] = "Good email address.  Yay!";
 $config["gwc all good msg"] = "All commits have good email addresses.  Yay!";
