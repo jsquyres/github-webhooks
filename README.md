@@ -33,7 +33,13 @@ Installation is comprised of two parts:
        https://github.com/settings/tokens and clicking the "Generate
        new tokens" button in the top right (or
        https://YOUR_GHE_SERVER/settings/tokens).
-     * The only permission that this PAT needs is `repo:status`.
+     * For public repositories, the only permission that this PAT
+       needs is `repo:status`.
+     * For private repositories, it is important to select the outer
+       `repo` permission ("full control of private repositories").
+       This will automatically check all the sub-repo permissions as
+       well.  It is *not* sufficient to simply check all the sub-repo
+       permissions and leave the outer `repo` status unchecked.
 1. Configure your web server to deny client access to the
    `*.inc` files.
    * ***THIS IS NOT OPTIONAL***
