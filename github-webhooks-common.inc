@@ -170,7 +170,7 @@ function gwc_open_curl($url, $config)
     return $ch;
 }
 
-function gwc_get_commits($commits_url, $config)
+function gwc_get_commits($commits_url, $num_commits, $config)
 {
     # This webhook will have only delivered the *new* commits on this
     # PR.  We need to examine *all* the commits on this PR -- so we
@@ -179,23 +179,46 @@ function gwc_get_commits($commits_url, $config)
     # (note: putting the Authorization header in this request just in
     # case this is a private repo).
 
-    $ch = gwc_open_curl($commits_url, $config);
-    $output = curl_exec($ch);
+    # Note that Github will only deliver a "page" full of commits at a
+    # time (as of Mar 2017, a "page" is 30 commits).  If the PR
+    # contains more than 30 commits, we have to make multiple calls to
+    # get them all.
 
-    # Check to see if we got success
-    if (curl_errno($ch)) {
+    $got = 0;
+    # Github pagination starts with page 1
+    $page = 1;
+    gwc_debug($config, "Looking for $num_commits commits...\n");
+    while ($got < $num_commits) {
+        gwc_debug($config, "Getting commits: $commits_url?page=$page\n");
+        $ch = gwc_open_curl("$commits_url?page=$page", $config);
+        $output = curl_exec($ch);
+
+        # Check to see if we got success
+        if (curl_errno($ch)) {
+            curl_close($ch);
+            gwc_die("Sorry, something went wrong while trying to obtain the URL \"$commits_url\".");
+        }
         curl_close($ch);
-        gwc_die("Sorry, something went wrong while trying to obtain the URL \"$commits_url\".");
+
+        $commits_tmp = gwc_parse_json($output);
+
+        # Sanity check
+        if (count($commits_tmp) == 0) {
+            gwc_die("Somehow there are no commits on this PR... weird...");
+        }
+
+        gwc_debug($config, "Page $page had " . count($commits_tmp) . " commits\n");
+
+        foreach ($commits_tmp as $key => $value) {
+            $commits[$got] = $value;
+            ++$got;
+        }
+        gwc_debug($config, "Total of " . count($commits) . " so far\n");
+
+        ++$page;
     }
-    curl_close($ch);
 
-    $commits = gwc_parse_json($output);
-
-    # Sanity check
-    if (count($commits) == 0) {
-        gwc_die("Somehow there are no commits on this PR... weird...");
-    }
-
+    gwc_debug($config, "Found a total of " . count($commits) . " commits\n");
     return $commits;
 }
 
@@ -450,7 +473,8 @@ function gwc_webhook_main($config)
 
             # Get the JSON of the commits on this PR
             $commits_url = $json->{"pull_request"}->{"commits_url"};
-            $commits = gwc_get_commits($commits_url, $config);
+            $num_commits = $json->{"pull_request"}->{"commits"};
+            $commits = gwc_get_commits($commits_url, $num_commits, $config);
 
             # Process the commits
             $opts = gwc_fill_opts_from_keys($config, $opts, $value);
