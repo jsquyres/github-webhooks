@@ -42,6 +42,22 @@ function fill_webhook_config()
     # You almost certainly want "debug" set to 0 (or unset)
     $config["debug"] = 0;
 
+    # Do you want to set the status on *every* commit to be "good" or
+    # bad?  Or do you want to only set the status on *bad* commits and
+    # the *last* commit?  For large pull requests (e.g., over 60 or 80
+    # commits), setting the status on *every* commit can be quite
+    # slow, and github may timeout the webhook before it completes.
+    $config["set only bad+final"] = true;
+
+    # Failsafe: in *ALL* cases (regardless of the value of "set only
+    # bad+final"), only set this number of statuses (plus the last
+    # status).  This prevents Github from timing out this webhook if
+    # someone creates a PR with a large number of bad commits (and
+    # therefore this webhook doesn't get the chance to set the
+    # final/PR-wide status).  It is risky to set this number much
+    # higher than 30.
+    $config["max num statuses to set"] = 30;
+
     # These are the repos for which we are allowed to reply.
     # Valid values are:
     # - a full repo name, such as: jsquyres/email-checker-github-webhook
