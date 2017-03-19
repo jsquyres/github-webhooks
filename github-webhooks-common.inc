@@ -41,6 +41,7 @@ function gwc_die($msg, $code = 400)
 function gwc_debug($config, $str)
 {
     if (isset($config["debug"]) && $config["debug"]) {
+        print date('Y-m-d H:i:s: ');
         print($str);
     }
 }
