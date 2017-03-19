@@ -381,7 +381,7 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
         ++$i;
     }
 
-    gwc_debug($config, "$debug_message\n");
+    gwc_debug($config, "$debug_message");
     printf("Final evaluation: $final_message\n");
 
     # Happiness!  Exit.
