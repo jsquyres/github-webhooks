@@ -446,6 +446,8 @@ function gwc_webhook_main($config)
     $repo = $json->{"repository"}->{"full_name"};
     foreach ($config["github"] as $key => $value) {
         if (gwc_repo_matches($repo, $key)) {
+            gwc_debug($config, "repo matches: $repo / $key\n");
+
             # Get the JSON of the commits on this PR
             $commits_url = $json->{"pull_request"}->{"commits_url"};
             $commits = gwc_get_commits($commits_url, $config);
