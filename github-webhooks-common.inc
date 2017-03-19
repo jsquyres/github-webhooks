@@ -297,7 +297,7 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
 
             $happy = false;
         }
-        $debug_message .= "This commit is: ". $status["description"];
+        $debug_message .= "This commit is: ". $status["description"] . "\n";;
         $final_message = $status["description"];
 
         # If this is the last commit in the array (and there's more than
@@ -329,7 +329,7 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
     }
 
     gwc_debug($config, "$debug_message\n");
-    printf("$final_message\n");
+    printf("Final evaluation: $final_message\n");
 
     # Happiness!  Exit.
     exit(0);
