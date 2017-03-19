@@ -271,9 +271,21 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
     $debug_message = "checking URL: $commits_url\n\n";
     $final_message = "";
 
+    if (isset($config["max num statuses to set"])) {
+        $max_status_set_count = $config["max num statuses to set"];
+    } else {
+        $max_status_set_count = 30;
+    }
+    if (isset($config["set only bad+final"])) {
+        $set_only_bad_and_final = $config["set only bad+final"];
+    } else {
+        $set_only_bad_and_final = true;
+    }
+
     $i = 0;
     $good_count = 0;
     $bad_count = 0;
+    $status_set_count = 0;
     foreach ($commits as $key => $value) {
         if (!isset($value->{"sha"}) ||
             !isset($value->{"commit"}) ||
@@ -327,7 +339,9 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
         # one commit in the array), override its state and description to
         # represent the entire PR (because Github shows the status of the
         # last commit as the status of the overall PR).
+        $last = false;
         if ($i == count($commits) - 1 && $i > 0) {
+            $last = true;
             if ($good_count == count($commits)) {
                 $status["state"]       = "success";
                 $status["description"] = $config["gwc all good msg"];
@@ -346,7 +360,23 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
         }
 
         # Send the results back to Github for this specific commit
-        gwc_set_github_commit_status($config, $status_url, $status);
+        # (...or not)
+        $debug_message .= "Setting status on this commit: ";
+        if ($last) {
+            $debug_message .= "YES\nReason: it is the last commit\n";
+            gwc_set_github_commit_status($config, $status_url, $status);
+        } else if ($status_set_count > $max_status_set_count) {
+            $debug_message .= "NO\nReason: we've set too many already\n";
+        } else if (!$good) {
+            $debug_message .= "YES\nReason: it is BAD!\n";
+            gwc_set_github_commit_status($config, $status_url, $status);
+        } else if (!$set_only_bad_and_final) {
+            $debug_message .= "YES\nReason: we're setting on *all* commits\n";
+            gwc_set_github_commit_status($config, $status_url, $status);
+        } else {
+            $debug_message .= "NO\nReason: we're only setting on the bad+last commits\n";
+        }
+        $debug_message .= "\n";
 
         ++$i;
     }
