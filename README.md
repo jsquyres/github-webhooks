@@ -143,7 +143,9 @@ and/or author emails.  For example:
 
 1. Ensure that the committer is a current employee in your
    organization (we do this in my group at work).
-1. Ensure that the author is from an approved list of authors.
+1. Ensure that both the author and committer use correct email address
+   (e.g., `username@mycompany.com` instead of
+   `username@some.internal.machine.name.mycompany.com`).
 
 And so on.
 
