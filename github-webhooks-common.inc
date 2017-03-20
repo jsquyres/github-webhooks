@@ -339,9 +339,7 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
         # one commit in the array), override its state and description to
         # represent the entire PR (because Github shows the status of the
         # last commit as the status of the overall PR).
-        $last = false;
         if ($i == count($commits) - 1 && $i > 0) {
-            $last = true;
             if ($good_count == count($commits)) {
                 $status["state"]       = "success";
                 $status["description"] = $config["gwc all good msg"];
@@ -362,7 +360,7 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
         # Send the results back to Github for this specific commit
         # (...or not)
         $debug_message .= "Setting status on this commit: ";
-        if ($last) {
+        if ($i == count($commits) - 1) {
             $debug_message .= "YES\nReason: it is the last commit\n";
             gwc_set_github_commit_status($config, $status_url, $status);
         } else if ($status_set_count > $max_status_set_count) {
