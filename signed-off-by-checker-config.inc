@@ -58,6 +58,10 @@ function fill_webhook_config()
     # higher than 30.
     $config["max num statuses to set"] = 30;
 
+    # Should we ignore merge commits?  I.e., commits with more than
+    # one parent.
+    $config["ignore merge commits"] = 1;
+
     # These are the repos for which we are allowed to reply.
     # Valid values are:
     # - a full repo name, such as: jsquyres/email-checker-github-webhook

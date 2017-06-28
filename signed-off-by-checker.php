@@ -19,6 +19,14 @@ require_once "github-webhooks-common.inc";
 
 function signed_off_by_checker($commit, $config, &$msg_out)
 {
+    # Skip this commit if it's a merge commit and we've been told to
+    # skip merge commits.
+    if (isset($config["ignore merge commits"]) &&
+        $config["ignore merge commits"] &&
+        count($commit->{"parents"}) > 1) {
+        return true;
+    }
+
     if (preg_match("/Signed-off-by: /", $commit->{"commit"}->{"message"})) {
         return true;
     } else {
