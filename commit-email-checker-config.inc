@@ -64,14 +64,44 @@ function fill_webhook_config()
     # Config specific to the bozo email checker
     #####################################################################
 
+    # You can define any of the "bad", "good", and/or "hooks" values,
+    # or leave them undefined (although you probably want to define at
+    # least one of them!).
+
     # Array of regular expressions used to check author/committer
     # email addresses.  These are Perl-style regular expressions
-    # (i.e., they are passed to the PHP function preg_match()).
+    # (i.e., they are passed to the PHP function preg_match()).  If
+    # any of these match, fail the test.
     $config["bad"] = array(
         "/^root@/",
         "/localhost/",
         "/localdomain/");
 
+    # Array of regular expressions used to check author/committer
+    # email addresses.  These are Perl-style regular expressions
+    # (i.e., they are passed to the PHP function preg_match()).  If
+    # any of these DO NOT match, fail the test (i.e., all of them must
+    # match to pass the test).
+    $config["good"] = array(
+        '/^(\w+)\@mydomain\.com$/i');
+
+    # Array function names to be called for each commit (i.e., any
+    # custom code you want to check).  Note that these hooks are only
+    # called if the above good/bad checks pass.
+    $config["hooks"] = array(
+        "my_email_check_function");
+
     # Return the $config variable
     return $config;
+}
+
+# Called from $config["hooks"].  $id will be either "author" or
+# "committer", and $email will be the email address.
+#
+# If you return true, the test passed (yay!).  If you return false,
+# the test failed (boo!).
+function my_email_check_function($id, $email)
+{
+    # ...do some meaningful check here...
+    return true;
 }

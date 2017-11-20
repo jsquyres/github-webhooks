@@ -23,10 +23,33 @@ function email_checker($commit, $config, &$msg_out)
     $committer = $commit->{"commit"}->{"committer"}->{"email"};
 
     foreach (array("author", "committer") as $id) {
-        foreach ($config["bad"] as $ba_value) {
-            if (preg_match("$ba_value", ${$id})) {
-                $msg_out = "Bad $id email: ${$id}";
-                return false;
+        # Make sure we don't match any "bad" addresses
+        if (array_key_exists("bad", $config)) {
+            foreach ($config["bad"] as $ba_value) {
+                if (preg_match("$ba_value", ${$id})) {
+                    $msg_out = "Bad $id email: ${$id}";
+                    return false;
+                }
+            }
+        }
+
+        # Make sure we match all "good" addresses
+        if (array_key_exists("good", $config)) {
+            foreach ($config["good"] as $ga_value) {
+                if (!preg_match("$ga_value", ${$id})) {
+                    $msg_out = "Failed good check: $id email: ${$id}";
+                    return false;
+                }
+            }
+        }
+
+        # Run any custom code
+        if (array_key_exists("hooks", $config)) {
+            foreach ($config["hooks"] as $hook) {
+                if (!call_user_func($hook, $id, ${$id})) {
+                    $msg_out = "Failed hook $hook: $id $email: ${$id}";
+                    return false;
+                }
             }
         }
     }
