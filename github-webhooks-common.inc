@@ -297,7 +297,7 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
 
         $sha = $value->{"sha"};
         $repo = $json->{"repository"}->{"full_name"};
-        $status_url = $config["api_url_base"] . "/repos/$repo/statuses/$sha";
+        $status_url = $json->{"pull_request"}->{"statuses_url"};
         $debug_message .= "examining commit index $i / sha $sha:\nstatus url: $status_url\n";
 
         $status = array(
