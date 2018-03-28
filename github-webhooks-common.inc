@@ -257,6 +257,7 @@ function gwc_set_github_commit_status($config, $status_url, $status)
     curl_setopt($ch, CURLOPT_POST, 1);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($status));
     $output = curl_exec($ch);
+    gwc_debug($config, "Set github status on $status_url: curl output:\n$output");
     curl_close($ch);
 }
 
@@ -290,7 +291,7 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
         if (!isset($value->{"sha"}) ||
             !isset($value->{"commit"}) ||
             !isset($value->{"commit"}->{"message"})) {
-            gwc_die("Somehow commit information is missing from Github's response...");
+            gwc_die("Somehow commit information is missing from Github's response: $value");
         }
 
         $message = $value->{"commit"}->{"message"};
@@ -489,6 +490,7 @@ function gwc_webhook_main($config)
 
     $payload = gwc_get_payload();
     $json = gwc_parse_json($payload);
+    gwc_debug($config, "Got JSON payload: $payload\n\n");
     $opts = gwc_fill_opts_from_json($json);
 
     # Loop over all the repos in the config; see if this incoming
