@@ -188,34 +188,68 @@ function gwc_get_commits($commits_url, $num_commits, $config)
     # Github pagination starts with page 1
     $page = 1;
     gwc_debug($config, "Looking for $num_commits commits...\n");
-    while ($got < $num_commits) {
-        gwc_debug($config, "Getting commits: $commits_url?page=$page\n");
-        $ch = gwc_open_curl("$commits_url?page=$page", $config);
-        $output = curl_exec($ch);
 
-        # Check to see if we got success
-        if (curl_errno($ch)) {
+    # Try to get the whole sequence a few times before giving up
+    $try_num = 0;
+    $max_retries = 5;
+    while ($try_num < $max_retries) {
+        gwc_debug("Attempt $try_num of $max_retries\n");
+
+        while ($got < $num_commits) {
+            gwc_debug($config, "Getting commits page $page: $commits_url?page=$page\n");
+            $ch = gwc_open_curl("$commits_url?page=$page", $config);
+            $output = curl_exec($ch);
+            gwc_debug($config, "Got output from curl: $output\n");
+
+            # Check to see if we got success
+            if (curl_errno($ch)) {
+                curl_close($ch);
+                gwc_die("Sorry, something went wrong while trying to obtain the URL \"$commits_url\".");
+            }
             curl_close($ch);
-            gwc_die("Sorry, something went wrong while trying to obtain the URL \"$commits_url\".");
+
+            $commits_tmp = gwc_parse_json($output);
+
+	    # There is a race condition: sometimes github issues the
+	    # webhook to us and we try to retrieve the commits URL
+	    # before github is ready.  Hence, if we get a
+	    # "message":"Not Found" response back in the JSON, then
+	    # just sleep a short period of time and try again.
+            # {"message":"Not Found","documentation_url":"https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request"}
+	    if (array_key_exists('message', $commits_tmp) &&
+                $commits_tmp->{'message'} == 'Not Found') {
+                gwc_debug($config, "We retrieved the commits URL from the github server before it was ready -- sleep and try again...");
+                break;
+            }
+
+            # Sanity check
+            if (count($commits_tmp) == 0) {
+                gwc_die("Somehow there are no commits on this page... weird...");
+                break;
+            }
+
+            gwc_debug($config, "Page $page had " . count($commits_tmp) . " commits\n");
+
+            foreach ($commits_tmp as $key => $value) {
+                gwc_debug($config, "Found commit $got: key $key\n");
+                $commits[$got] = $value;
+                ++$got;
+            }
+            gwc_debug($config, "Total of " . count($commits) . " so far\n");
+
+            ++$page;
         }
-        curl_close($ch);
 
-        $commits_tmp = gwc_parse_json($output);
-
-        # Sanity check
-        if (count($commits_tmp) == 0) {
-            gwc_die("Somehow there are no commits on this PR... weird...");
+        if ($got >= $num_commits) {
+            break;
         }
 
-        gwc_debug($config, "Page $page had " . count($commits_tmp) . " commits\n");
+        sleep(1);
+        ++$try_num;
+    }
 
-        foreach ($commits_tmp as $key => $value) {
-            $commits[$got] = $value;
-            ++$got;
-        }
-        gwc_debug($config, "Total of " . count($commits) . " so far\n");
-
-        ++$page;
+    if ($got < $num_commits) {
+        gwc_die($config, "We got $got commits (out of $num_commits) after $max_retries attempts.  I give up.\n");
     }
 
     gwc_debug($config, "Found a total of " . count($commits) . " commits\n");
@@ -257,6 +291,7 @@ function gwc_set_github_commit_status($config, $status_url, $status)
     curl_setopt($ch, CURLOPT_POST, 1);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($status));
     $output = curl_exec($ch);
+    gwc_debug($config, "Set github status on $status_url: curl output:\n$output");
     curl_close($ch);
 }
 
@@ -290,7 +325,7 @@ function gwc_check_all_commits($commits_url, $json, $config, $opts, $commits)
         if (!isset($value->{"sha"}) ||
             !isset($value->{"commit"}) ||
             !isset($value->{"commit"}->{"message"})) {
-            gwc_die("Somehow commit information is missing from Github's response...");
+            gwc_die("Somehow commit information is missing from Github's response: $value");
         }
 
         $message = $value->{"commit"}->{"message"};
@@ -489,6 +524,7 @@ function gwc_webhook_main($config)
 
     $payload = gwc_get_payload();
     $json = gwc_parse_json($payload);
+    gwc_debug($config, "Got JSON payload: $payload\n\n");
     $opts = gwc_fill_opts_from_json($json);
 
     # Loop over all the repos in the config; see if this incoming
